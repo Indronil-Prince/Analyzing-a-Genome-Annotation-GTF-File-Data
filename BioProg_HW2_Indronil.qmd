@@ -1,0 +1,231 @@
+---
+title: '**C S 509 HW2**'
+jupyter:
+  kernelspec:
+    display_name: R
+    language: R
+    name: ir
+---
+
+
+**Author:** Indronil Bhattacharjee
+
+**Submitted on:** September 12, 2023
+
+
+=============================================================
+
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:46:53.568674Z', iopub.status.busy: '2023-09-12T05:46:53.566564Z', iopub.status.idle: '2023-09-12T05:48:10.388616Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Load required libraries
+library(dplyr)
+library(ggplot2)
+
+# Load the GFF3 file (replace 'path_to_gff3_file' with the actual file path)
+gff3_file <- read.table("gencode-human-genome-annotation/gencode.v44.primary_assembly.annotation.gff3", header = FALSE, comment.char = "#", sep = "\t")
+```
+
+### **Function description to find Chromosomes with the minimum and maximum number of given attribute** (gene, transcript or CDS)
+
+The function "attribute_count" is designed to find chromosomes with the minimum and maximum number of a given attribute (specified by the parameter) in a GFF3 file. We performed the following steps:
+
+1. **Filter by Feature Type and Chromosome:** It filters the GFF3 file to retain only entries with the specified feature type (str) and entries where the V1 column (chromosome information) starts with "chr" (Since chromosomes are named in the format "chr1," "chr2," etc.). This step narrows down the entries of interest.
+
+2. **Group and Summarize:** It groups the filtered entries by chromosome and calculates the total count of the specified attribute (total_attr) within each chromosome.
+
+3. **Find Min and Max:** It identifies the chromosomes with the minimum and maximum counts of the specified attribute.
+
+4. **Print and Visualize:** It prints information about the attribute count on each chromosome, including the chromosomes with the minimum and maximum counts.
+
+Overall, this function analyzes and visualizes the distribution of a specific attribute across different chromosomes in a GFF3 file, helps to identify chromosomes with the highest and lowest counts of that attribute.
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:10.423258Z', iopub.status.busy: '2023-09-12T05:48:10.391357Z', iopub.status.idle: '2023-09-12T05:48:10.436902Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Function description to find Chromosomes with the minimum and maximum number of given attribute
+attribute_count <- function(str){
+  attr <- gff3_file %>%
+  filter(V3 == str) %>%
+  filter(grepl('^chr', V1)) %>%
+  mutate(chromosome = V1) %>%
+  group_by(chromosome) %>%
+  summarize(total_attr = n())
+
+# Find chromosomes with min and max number of given attributes
+min_attr = min(attr$total_attr)
+min_attr_chromosomes <- attr[attr$total_attr == min_attr, "chromosome"]
+max_attr = max(attr$total_attr)
+max_attr_chromosomes <- attr[attr$total_attr == max_attr, "chromosome"]
+
+cat(paste(str,"Density of Chromosomes"))
+cat("\n=================================================\n")
+
+print(as_tibble(attr), n=40)
+# Visualize given attribute counts on each chromosome
+barplot(attr$total_attr, names.arg = attr$chromosome, xlab = "Chromosome", ylab = paste("Total",str), main = paste(str,"Count on Each Chromosome"))
+
+# Print chromosomes with min and max number of given attributes
+cat(paste("Chromosomes with the minimum number of",str,":"), paste(min_attr_chromosomes, collapse = ", "), min_attr,"\n")
+cat(paste("Chromosomes with the maximum number of",str,":"), paste(max_attr_chromosomes, collapse = ", "), max_attr, "\n")
+}
+```
+
+### **Function description to find Chromosomes with the minimum and maximum density of given attribute** (gene, transcript or CDS)
+
+The function "attribute_density" is designed to find chromosomes with the minimum and maximum density of a given attribute (specified by the parameter) in a GFF3 file. The code performs the following steps:
+
+1. **Filter by Feature Type and Chromosome:** It filters the GFF3 file to retain only entries with the specified feature type (str) and entries where the V1 column (chromosome information) starts with "chr" (Since chromosomes are named in the format "chr1," "chr2," etc.). This step narrows down the entries of interest.
+
+2. **Group and Summarize:** It groups the filtered entries by chromosome and calculates the total count of the specified attribute (total_attr) within each chromosome.
+
+3. **Calculate Chromosome Lengths:** It calculates the length of each chromosome based on the maximum coordinate value (V5 column) for entries of the specified feature type (str).
+
+4. **Calculate Attribute Density:** It calculates the density of the specified attribute (density) on each chromosome by dividing the total count of the attribute by the chromosome's length.
+
+5. **Print and Visualize:** It visualizes the attribute density on each chromosome using a bar plot and identifies chromosomes with the minimum and maximum attribute density.
+
+Overall, this function analyzes and visualizes the distribution of a specific attribute's density across different chromosomes in a GFF3 file, helps to identify chromosomes with the highest and lowest attribute densities.
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:10.449670Z', iopub.status.busy: '2023-09-12T05:48:10.447860Z', iopub.status.idle: '2023-09-12T05:48:10.464727Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Function description to find Chromosomes with the minimum and maximum given attribute density
+attribute_density <- function(str){
+  attr <- gff3_file %>%
+  filter(V3 == str) %>%
+  filter(grepl('^chr', V1)) %>%
+  mutate(chromosome = V1) %>%
+  group_by(chromosome) %>%
+  summarize(total_attr = n())
+    
+  chromosome_lengths <- gff3_file %>%
+  filter(V3 == str) %>%
+  filter(grepl('^chr', V1)) %>%
+  mutate(chromosome = V1) %>%
+  group_by(chromosome) %>%
+  summarize(chromosome_length = max(V5)) %>%
+  ungroup()
+
+cat(paste(str,"Density of Chromosomes"))
+cat("\n=================================================\n")
+# Calculate gene density
+attr_density <- attr %>%
+  left_join(chromosome_lengths, by = "chromosome") %>%
+  mutate(density = total_attr / chromosome_length)
+
+# Visualize gene density on each chromosome
+min_density_chromosome <- attr_density[which.min(attr_density$density), "chromosome"]
+max_density_chromosome <- attr_density[which.max(attr_density$density), "chromosome"]
+
+print(as_tibble(attr_density), n=40)    
+barplot(attr_density$density, names.arg = attr_density$chromosome, xlab = "Chromosome", ylab = paste(str,"Density"), main = paste(str,"Density on Each Chromosome"))
+
+# Print chromosomes with min and max given attribute density
+cat(paste("Chromosomes with the minimum", str, "density:"), paste(min_density_chromosome, collapse = ", "), min(attr_density$density),"\n")
+cat(paste("Chromosomes with the maximum", str, "density:"), paste(max_density_chromosome, collapse = ", "), max(attr_density$density),"\n")
+}
+```
+
+### **Task 1:** Number of genes on each chromosome
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:10.469862Z', iopub.status.busy: '2023-09-12T05:48:10.468066Z', iopub.status.idle: '2023-09-12T05:48:10.939223Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Task 1: Number of genes on each chromosome
+attribute_count("gene")
+```
+
+### **Task 2:** Gene density on each chromosome
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:10.945885Z', iopub.status.busy: '2023-09-12T05:48:10.943562Z', iopub.status.idle: '2023-09-12T05:48:11.424441Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Task 2: Gene density on each chromosome
+attribute_density("gene")
+```
+
+### **Task 3:** a) Number of transcripts on each chromosome
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:11.428603Z', iopub.status.busy: '2023-09-12T05:48:11.427177Z', iopub.status.idle: '2023-09-12T05:48:11.777452Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Task 3: Numbers and density of transcripts on each chromosome
+# Repeat Task 1 and 2 for transcripts
+attribute_count("transcript")
+```
+
+### **Task 3:** b) Density of transcripts on each chromosome
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:11.781576Z', iopub.status.busy: '2023-09-12T05:48:11.780098Z', iopub.status.idle: '2023-09-12T05:48:12.769958Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+attribute_density("transcript")
+```
+
+### **Task 4:** a) Number of CDS on each chromosome
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:12.774085Z', iopub.status.busy: '2023-09-12T05:48:12.772612Z', iopub.status.idle: '2023-09-12T05:48:13.260657Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Task 4: Numbers and density of CDS on each chromosome 
+# Repeat Task 1 and 2 for CDS
+attribute_count("CDS")
+```
+
+### **Task 4:** b) Density of CDS on each chromosome
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:13.264793Z', iopub.status.busy: '2023-09-12T05:48:13.263382Z', iopub.status.idle: '2023-09-12T05:48:14.555162Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+attribute_density("CDS")
+```
+
+### **Task 5:** Overall Statistics
+
+1. **Total annotated intervals:** Total number of rows in the gff3 file
+
+2. **Total genes:** Total number of rows in the gff3 file where **type (V3)= "gene"**
+
+3. **Total protein coding genes:** Total number of genes where attributes (V9) contains tag **gene_type=protein_coding**
+
+4. **Total non-coding genes:** Total number of genes other than the non-coding genes
+
+```{r}
+#| execution: {iopub.execute_input: '2023-09-12T05:48:14.559307Z', iopub.status.busy: '2023-09-12T05:48:14.557877Z', iopub.status.idle: '2023-09-12T05:48:14.842675Z'}
+#| trusted: true
+#| vscode: {languageId: r}
+# Task 5: Overall statistics
+# 5.1 Number of intervals annotated in this version
+total_intervals <- nrow(gff3_file)
+cat("Total annotated intervals:", total_intervals, "\n")
+
+# 5.2 Total number of genes annotated in the human genome
+genes <- gff3_file[gff3_file $ V3 == "gene",]
+total_genes <- nrow(genes)
+cat("Total genes:", total_genes, "\n")
+
+# 5.3 Number of protein coding genes
+protein_coding_genes <- genes[grep("gene_type=protein_coding", genes$V9), ]
+total_protein_coding_genes = nrow(protein_coding_genes)
+cat("Total protein coding genes:", total_protein_coding_genes, "\n")
+
+# 5.4 Number of noncoding genes
+total_noncoding_genes <- total_genes - total_protein_coding_genes
+cat("Total noncoding genes:", total_noncoding_genes, "\n")
+```
+
+#### **References**
+
+[1] https://bioinformatics.stackexchange.com/questions/5621/derive-a-gtf-containing-protein-coding-genes-from-a-gtf-file-with-exons-and-cds
+
